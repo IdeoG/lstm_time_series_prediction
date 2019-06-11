@@ -6,13 +6,13 @@ import torch.nn as nn
 import torch.optim as optim
 from matplotlib.gridspec import GridSpec
 
-from time_series_generation.model import Sequence
+from time_sequence_generation.model import SequenceModel
 
 matplotlib.use('Agg')
 
 
 def generate_train_test(train_pct=0.9, window_size=64, step_size=32, net_size=25600):
-    x = np.linspace(0, step_size * window_size // 2, net_size)
+    x = np.linspace(0, step_size * window_size, net_size)
 
     y1 = np.sin(x + 1)
     y2 = np.cos(2 * x)
@@ -32,52 +32,58 @@ def generate_train_test(train_pct=0.9, window_size=64, step_size=32, net_size=25
     return y_train[:-1], y_train[1:], y_test[:-1], y_test[1:]
 
 
-def _epoch_save_results(epoch, y, y_gt, y_in, future):
-    n_samples = 4
-    colors = ['r', 'g', 'b', 'y']
-    n_functions = 5
-    gs = GridSpec(n_functions, 1)
-    figure = plt.figure(figsize=(30, 20))
-
-    for func_idx in range(n_functions):
-        ax: plt.Axes = figure.add_subplot(gs[func_idx])
-
-        for sample_idx, color in zip(range(n_samples), colors):
-            data = y[sample_idx, :, func_idx]
-            data_in = y_in[sample_idx, :, func_idx].tolist()
-            data_gt = y_gt[sample_idx, :, func_idx].tolist()
-
-            ax.plot(np.arange(-len(data_in), 0), data_in, color, linewidth=2.0)
-            ax.plot(np.arange(len(data_gt) // 2), data_gt[:len(data_gt) // 2], color + '--', linewidth=2.0)
-
-            ax.plot(np.arange(-len(data[:-future]) // 2, len(data[:-future]) // 2), data[:-future], color + ':',
-                    linewidth=2.0)
-            ax.grid(True)
-
-    figure.savefig(f'images/double predict {epoch}.png')
-    plt.close()
-
-
 def train():
-    m_train_input, m_train_target, m_test_input, m_test_target = generate_train_test()
+    train_input, train_target, test_input, test_target = generate_train_test()
 
-    model = Sequence().cuda()
+    model = SequenceModel().cuda()
 
     criterion = nn.MSELoss()
     optimizer = optim.LBFGS(model.parameters(), lr=0.2)
 
-    n_epoches = 100
+    n_epochs = 100
+    future = 10
+    n_samples = 4
 
-    for epoch in range(n_epoches):
-        print(f"Epoch {epoch + 1} out of {n_epoches}")
-        future = 10
+    for epoch in range(n_epochs):
+        print(f"Epoch {epoch + 1} out of {n_epochs}")
 
-        _epoch_model_train(optimizer, m_train_input, m_train_target, model, criterion)
-        y = _epoch_model_eval(criterion, m_test_input, m_test_target, model, future)
-        _epoch_save_results(epoch, y, m_test_target, m_test_input, future)
+        _epoch_model_train(optimizer, train_input, train_target, model, criterion)
+        y = _epoch_model_eval(criterion, test_input, test_target, model, future)
+        _epoch_save_results(epoch, y, test_target, test_input, future, n_samples)
+
+
+def _epoch_save_results(epoch, y, y_gt, y_in, future, n_samples):
+    colors = ['r', 'g', 'b', 'y', 'm', 'c', 'k']
+    n_functions = y.shape[-1]
+    window_size = y.shape[1] - future
+
+    gs = GridSpec(n_functions, 1)
+    figure = plt.figure(figsize=(20, 10))
+
+    for func_idx in range(n_functions):
+        ax: plt.Axes = figure.add_subplot(gs[func_idx])
+        ax.grid(True)
+
+        for idx, (sample_idx, color) in enumerate(zip(range(n_samples), colors)):
+            data = y[sample_idx, :, func_idx]
+            data_in = y_in[sample_idx, :, func_idx].tolist()
+            data_gt = y_gt[sample_idx, :, func_idx].tolist()
+
+            ax.plot(np.arange(-window_size + 1, 1), data_in, color, linewidth=4.0, label='input')
+            ax.plot(np.arange(window_size // 2), data_gt[window_size // 2:], color + '--',
+                    linewidth=3.0, label='ground true')
+            ax.plot(np.arange(window_size // 2), data[window_size // 2:-future], color + ':',
+                    linewidth=2.0, label='prediction')
+
+            if not idx:
+                ax.legend(loc='upper left')
+
+    figure.savefig(f'images/predict {epoch}.png')
+    plt.close()
 
 
 def _epoch_model_eval(criterion, m_test_input, m_test_target, model, future):
+    model.eval()
     with torch.no_grad():
         pred = model(m_test_input.cuda(), future=future)
         loss = criterion(pred[:, :-future], m_test_target.cuda())
@@ -88,6 +94,8 @@ def _epoch_model_eval(criterion, m_test_input, m_test_target, model, future):
 
 
 def _epoch_model_train(optimizer, m_train_input, m_train_target, model, criterion):
+    model.train()
+
     def closure():
         optimizer.zero_grad()
 
