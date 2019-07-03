@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='lstm-time-series-prediction',
+    name='lstm_time_series_prediction',
     version='v0.0.2',
     packages=[''],
     url='',
