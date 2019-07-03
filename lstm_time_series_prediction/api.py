@@ -7,7 +7,7 @@ from lstm_time_series_prediction import utils, train, dataloader
 logger = logging.getLogger(__name__)
 
 
-class MLDDOSDetector:
+class TimeSeriesPrediction:
 
     def __init__(self, work_dir='../', use_cuda=False):
         if utils._model is None or work_dir != '../':
