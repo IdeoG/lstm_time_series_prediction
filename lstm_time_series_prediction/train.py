@@ -33,7 +33,8 @@ def train(
     model_dir = '{}/meta/models/{}_lr={}'.format(work_dir, printable_time, lr)
     pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
 
-    with open('{}/models/params.pkl'.format(work_dir), 'rb') as params_file:
+    params_dir = '{}/models'.format(work_dir)
+    with open('{}/params.pkl'.format(params_dir), 'rb') as params_file:
         data_params = pickle.load(params_file)
 
     min_test_loss = -1
@@ -49,7 +50,7 @@ def train(
 
             if test_loss < min_test_loss or epoch == 0:
                 min_test_loss = test_loss
-                torch.save(model.state_dict(), '{}/model.pth'.format(model_dir))
+                torch.save(model.state_dict(), '{}/model_{}_{}.pth'.format(model_dir, epoch, round(min_test_loss, 3)))
 
 
 def _epoch_save_results(y, y_gt, y_in, params, n_samples=5):

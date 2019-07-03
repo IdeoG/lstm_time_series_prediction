@@ -1,4 +1,5 @@
 import logging
+import pathlib
 import pickle
 from typing import List
 
@@ -24,7 +25,7 @@ def preprocess_dataset(raw_data: np.ndarray, work_dir='../', window_size=30, ste
     """ Preprocess input raw_data, raw_data.shape = (m, n)
         n - number of features, m - number of points
 
-    :param raw_data: Input array with data, [(src, dst, ts), ...]. Note: raw_dataset should be sorted by 'ts' key
+    :param raw_data: Input array with data
     :param work_dir: working directory to models directory, work_dir/models
     :param window_size: input for neural network, amount of sequenced points to predict a future
     :param step_size: step time to predict future. let y - prediction, t(y) = t(x) + t(step_size)
@@ -32,16 +33,12 @@ def preprocess_dataset(raw_data: np.ndarray, work_dir='../', window_size=30, ste
     """
 
     n_features = raw_data.shape[1]
-    mean = raw_data.mean(axis=1, keepdims=True)
-    std = raw_data.std(axis=1, keepdims=True)
-    std[std < 1e-3] = 1.0
-    ip_frames_per_period = (raw_data - mean) / std
+    params_dir = '{}/models'.format(work_dir)
+    pathlib.Path(params_dir).mkdir(parents=True, exist_ok=True)
 
-    with open('{}/models/params.pkl'.format(work_dir), 'wb') as params_file:
-        pickle.dump({'mean': mean.squeeze(), 'std': std.squeeze(),
-                     'window_size': window_size, 'step_size': step_size,
-                     'n_features': n_features},
+    with open('{}/params.pkl'.format(params_dir), 'wb') as params_file:
+        pickle.dump({'window_size': window_size, 'step_size': step_size, 'n_features': n_features},
                     params_file)
 
     # TODO: add k-fold and test, eval, train sets
-    return _split_train_test(ip_frames_per_period, window_size, step_size)
+    return _split_train_test(raw_data, window_size, step_size)

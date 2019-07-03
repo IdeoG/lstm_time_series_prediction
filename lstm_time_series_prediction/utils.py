@@ -62,21 +62,14 @@ def inference(xi: np.ndarray) -> np.ndarray:
     global _model, _model_params, _model_device
 
     with torch.no_grad():
-        xi = np.expand_dims(xi, axis=0)
-        xi_hat = (xi - _model_params['mean']) / _model_params['std']
-        xi_hat = torch.tensor(xi_hat, dtype=torch.float32).to(_model_device)
+        xi = torch.tensor(xi, dtype=torch.float32).to(_model_device).unsqueeze(dim=0)
+        yi = _model(xi).detach().cpu().numpy().squeeze(axis=0)
 
-        prediction = _model(xi_hat)
-        yi_hat = prediction.detach().cpu().numpy()
-        yi = yi_hat * _model_params['std'] + _model_params['mean']
-
-    return yi.squeeze(axis=0)
+    return yi
 
 
 def calculate_loss(a: np.ndarray, b: np.ndarray):
     if a is None or b is None:
         return -1.0
 
-    a = (a - _model_params['mean']) / _model_params['std']
-    b = (b - _model_params['mean']) / _model_params['std']
     return (np.square(a - b)).mean()
